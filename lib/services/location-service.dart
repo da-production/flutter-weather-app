@@ -1,25 +1,20 @@
-import 'dart:developer';
-
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter/material.dart';
 
 class LocationService{
 
   double latitude;
   double longitude;
+  List info = [];
 
-  Future<void> getLocation() async{
-    try{
-      var geolocator =   Geolocator();
-      var locationOptions =  LocationOptions(accuracy: LocationAccuracy.high);
-      geolocator.getPositionStream(locationOptions).listen(
-        (Position  position)  {
-            position == null ? 'Unknown' : latitude = position.latitude;
-            position == null ? 'Unknown' : longitude = position.longitude;
-      });
-    }catch(e){
-      throw 'Location errors: ${e}';
-    }
+//  Future getLocation() async{
+//    Geolocator().getPositionStream(LocationOptions(accuracy: LocationAccuracy.high)).listen(
+//      (Position  position) {
+//        return position;
+//    });
+//  }
 
+  Future getLocation() async{
+    Position position = await Geolocator().getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+    return position;
   }
 }

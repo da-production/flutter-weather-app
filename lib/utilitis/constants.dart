@@ -8,3 +8,5 @@ const orangewhite = Color.fromRGBO(236, 180, 37, 1);
 
 const bluePrimary = Color.fromRGBO(47, 81, 165, 1);
 const blueWhite = Color.fromRGBO(71, 130, 201, 1);
+
+const apiKey = 'fce74680be2e99df2825f0b3d8149f87';

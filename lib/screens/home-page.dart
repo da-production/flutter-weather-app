@@ -5,6 +5,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart';
+import 'package:weatherApp/services/location-service.dart';
 import 'package:weatherApp/utilitis/constants.dart';
 
 
@@ -14,8 +15,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  var latitude;
-  var longitude;
+  var lat;
+  var lon;
   var name ='';
   List weekDays = [
     'Mondays',
@@ -27,33 +28,116 @@ class _HomePageState extends State<HomePage> {
     'Sundays',
   ];
 
-  var i = 1;
-
   @override
-  void initState() {
+  void initState(){
     super.initState();
-    _getLocation();
+    _getCurrentData();
     _getData();
   }
-
-  void _getLocation() async{
-    var geolocator = Geolocator();
-    var locationOptions = LocationOptions(accuracy: LocationAccuracy.high, distanceFilter: 10);
-    geolocator.getPositionStream(locationOptions).listen(
-      (Position position) {
-        setState(() {
-          position == null ? 'Unknown' : latitude = position.latitude.toString();
-          position == null ? 'Unknown' : longitude = position.longitude.toString();
-        });
-        print(position.accuracy);
-      }
-    );
-  }
-
   Future _getData() async{
-    Response response = await get('https://fcc-weather-api.glitch.me/api/current?lat=36.7323533&lon=3.04976');
+    var getLocation = LocationService();
+    var location = await getLocation.getLocation();
+    var latitude = location.latitude;
+    var longitude = location.longitude;
+//    Response response = await get('https://fcc-weather-api.glitch.me/api/current?lat=${latitude}&lon=${longitude}');
+    Response response = await get('https://api.openweathermap.org/data/2.5/onecall?lat=${latitude}&lon=${longitude}&appid=${apiKey}');
     var result = jsonDecode(response.body);
     return result;
+  }
+
+  Future _getCurrentData() async{
+    var getLocation = LocationService();
+    var location = await getLocation.getLocation();
+    var latitude = location.latitude;
+    var longitude = location.longitude;
+//    Response response = await get('https://fcc-weather-api.glitch.me/api/current?lat=${latitude}&lon=${longitude}');
+    Response response = await get('https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}');
+    var result = jsonDecode(response.body);
+    return result;
+  }
+
+  _daily(){
+    return FutureBuilder(
+      future: _getData(),
+      builder: (context, snapshot){
+        if(snapshot.hasData){
+          return Container(
+            height: 250,
+            child: ListView.builder(
+                itemCount: snapshot.data['daily'].length,
+                scrollDirection: Axis.horizontal,
+                itemBuilder: (context, i){
+                  return Container(
+                    margin: EdgeInsets.all(5),
+                    padding: EdgeInsets.all(10),
+                    width: 300,
+                    height: 100,
+                    decoration: BoxDecoration(
+                        color: Color.fromRGBO(0, 0, 0, 0.2),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Color.fromRGBO(0, 0, 0, 0.1),
+                              offset: Offset(0,10),
+                              spreadRadius: 5,
+                              blurRadius: 10
+                          )
+                        ]
+                    ),
+                    child: Column(
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              flex: 3,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.max,
+                                children: <Widget>[
+                                  Text('${snapshot.data['daily'][i]['weather'][0]['main']}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                                  Text('${(snapshot.data['daily'][i]['temp']['day'] - (273.15)).toStringAsFixed(0)}', style: TextStyle(fontSize: 75, color: Colors.white),),
+                                  Text('${snapshot.data['daily'][i]['weather'][0]['description']}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                                  SizedBox(height: 15,),
+                                  Row(
+                                    children: <Widget>[
+                                      Icon(Icons.arrow_drop_up, color: Colors.white,),
+                                      Text('min: ${(snapshot.data['daily'][i]['temp']['min'] - (273.15)).toStringAsFixed(0)}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                                      Icon(Icons.arrow_drop_down, color: Colors.white,),
+                                      Text('max: ${(snapshot.data['daily'][i]['temp']['max'] - (273.15)).toStringAsFixed(0)}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                                flex: 2,
+                                child: Padding(
+                                  padding: EdgeInsets.all(10),
+                                  child: Image(image: NetworkImage('http://openweathermap.org/img/w/${snapshot.data['daily'][i]['weather'][0]['icon']}.png'),width: 150,),
+                                )
+                            )
+                          ],
+                        ),
+                        SizedBox(height: 5,),
+                        Row(
+                          children: <Widget>[
+                            Text('Morning: ${(snapshot.data['daily'][i]['temp']['morn'] - (273.15)).toStringAsFixed(0)}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                            SizedBox(width: 20,),
+                            Text('Night:  ${(snapshot.data['daily'][i]['temp']['night'] - (273.15)).toStringAsFixed(0)}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                          ],
+                        )
+                      ],
+                    ),
+                  );
+                }
+            ),
+          );
+        }else{
+          return CircularProgressIndicator();
+        }
+
+      },
+    );
   }
 
 
@@ -67,7 +151,8 @@ class _HomePageState extends State<HomePage> {
         elevation: 0 ,
         actions: <Widget>[
           InkWell(
-            child: Padding(padding: EdgeInsets.only(right: 15), child: Icon(Icons.add),),
+            child: Padding(padding: EdgeInsets.only(right: 15), child: Icon(Icons.sync),),
+            onTap: _getData,
           )
         ],
       ),
@@ -81,10 +166,6 @@ class _HomePageState extends State<HomePage> {
                 tileMode: TileMode.clamp,
                 stops: [0.0, 0.3,0.5, 1],
                 colors: [
-//                  orangewhite,
-//                  orangePrimary,
-//                  orangePrimary,
-//                  orangePrimary,
                   greyPrimary,
                   whitePrimary,
                   whitePrimary,
@@ -93,14 +174,14 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          Center(
+          SingleChildScrollView(
               child: Container(
                 height: MediaQuery.of(context).size.height,
                 child: Column(
                   children: <Widget>[
                     SizedBox(height: 40,),
                     FutureBuilder(
-                      future: _getData(),
+                      future: _getCurrentData(),
                       builder: (context, snapshot){
                         if(snapshot.hasData){
                           return Text('${snapshot.data['name']}',style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold,fontStyle: FontStyle.italic, color: Colors.white),);
@@ -111,12 +192,10 @@ class _HomePageState extends State<HomePage> {
                     ),
 
                     SizedBox(height: 20,),
-                    Text('Latitude: ${latitude} Longitude: ${longitude}',style: TextStyle(fontSize: 15,fontStyle: FontStyle.italic, color: Colors.white),),
                     Divider(color: Colors.white,),
                     FutureBuilder(
-                        future: _getData(),
+                        future: _getCurrentData(),
                         builder: (context, snapshot){
-                          //print(snapshot);
                           if(snapshot.hasData){
 
                             return Padding(
@@ -131,15 +210,15 @@ class _HomePageState extends State<HomePage> {
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: <Widget>[
                                               Text('${snapshot.data['weather'][0]['main']}', style: TextStyle(fontSize: 15, color: Colors.white),),
-                                              Text('${snapshot.data['main']['temp']}', style: TextStyle(fontSize: 75, color: Colors.white),),
+                                              Text('${snapshot.data['main']['temp'] - (273.15)}', style: TextStyle(fontSize: 75, color: Colors.white),),
                                               Text('${snapshot.data['weather'][0]['description']}', style: TextStyle(fontSize: 15, color: Colors.white),),
                                               SizedBox(height: 15,),
                                               Row(
                                                 children: <Widget>[
                                                   Icon(Icons.arrow_drop_up, color: Colors.white,),
-                                                  Text('${snapshot.data['main']['temp_min']}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                                                  Text(' Min: ${(snapshot.data['main']['temp_min'] - (273.15)).toStringAsFixed(0)}', style: TextStyle(fontSize: 15, color: Colors.white),),
                                                   Icon(Icons.arrow_drop_down, color: Colors.white,),
-                                                  Text('${snapshot.data['main']['temp_max']}', style: TextStyle(fontSize: 15, color: Colors.white),),
+                                                  Text(' Max: ${(snapshot.data['main']['temp_max'] - (273.15)).toStringAsFixed(0)}', style: TextStyle(fontSize: 15, color: Colors.white),),
                                                 ],
                                               )
                                             ],
@@ -147,12 +226,13 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                       Expanded(
                                         flex: 1,
-                                        child: Image(image: NetworkImage('https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Weather_icon_-_sunny.svg/600px-Weather_icon_-_sunny.svg.png'),),
+                                        child: Image(image: NetworkImage('https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Weather_icon_-_sunny.svg/600px-Weather_icon_-_sunny.svg.png'), height: 100,),
                                       )
                                     ],
-                                  )
+                                  ),
                                 ],
                               ),
+
                             );
                           }else{
                             return CircularProgressIndicator();
@@ -163,73 +243,7 @@ class _HomePageState extends State<HomePage> {
                     SizedBox(height: 15,),
                     Text('daily',style: TextStyle(fontSize: 15, color: Colors.white),),
                     SizedBox(height: 15,),
-                    Container(
-                      height: 250,
-                      child: ListView.builder(
-                          itemCount: 7,
-                          scrollDirection: Axis.horizontal,
-                          itemBuilder: (context, i){
-                            return Container(
-                              margin: EdgeInsets.all(5),
-                              padding: EdgeInsets.all(10),
-                              width: 300,
-                              height: 100,
-                              decoration: BoxDecoration(
-                                  color: Color.fromRGBO(0, 0, 0, 0.2),
-                                  boxShadow: [
-                                    BoxShadow(
-                                        color: Color.fromRGBO(0, 0, 0, 0.1),
-                                        offset: Offset(0,10),
-                                        spreadRadius: 5,
-                                        blurRadius: 10
-                                    )
-                                  ]
-                              ),
-                              child: Column(
-                                children: <Widget>[
-                                  Row(
-                                    children: <Widget>[
-                                      Expanded(
-                                        flex: 3,
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisAlignment: MainAxisAlignment.start,
-                                          mainAxisSize: MainAxisSize.max,
-                                          children: <Widget>[
-                                            Padding(
-                                              padding: EdgeInsets.all(5),
-                                              child: Text(weekDays[i],style: TextStyle(fontSize: 20, color: Colors.white),),
-                                            ),
-                                            Text('clouds', style: TextStyle(fontSize: 15, color: Colors.white),),
-                                            Text('30', style: TextStyle(fontSize: 75, color: Colors.white),),
-                                            Text('broken clouds', style: TextStyle(fontSize: 15, color: Colors.white),),
-                                            SizedBox(height: 15,),
-                                            Row(
-                                              children: <Widget>[
-                                                Icon(Icons.arrow_drop_up, color: Colors.white,),
-                                                Text('23', style: TextStyle(fontSize: 15, color: Colors.white),),
-                                                Icon(Icons.arrow_drop_down, color: Colors.white,),
-                                                Text('29', style: TextStyle(fontSize: 15, color: Colors.white),),
-                                              ],
-                                            )
-                                          ],
-                                        ),
-                                      ),
-                                      Expanded(
-                                          flex: 2,
-                                          child: Padding(
-                                            padding: EdgeInsets.all(10),
-                                            child: Image(image: NetworkImage('https://upload.wikimedia.org/wikipedia/commons/thumb/0/08/Weather_icon_-_sunny.svg/600px-Weather_icon_-_sunny.svg.png'),),
-                                          )
-                                      )
-                                    ],
-                                  )
-                                ],
-                              ),
-                            );
-                          }
-                      ),
-                    )
+                    _daily()
                   ],
                 ),
               )
